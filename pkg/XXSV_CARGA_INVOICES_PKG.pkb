@@ -282,7 +282,7 @@ BEGIN
  
  VFLAG := 'UPDATE STATUS';   
  
- UPDATE XX_CARGA_ARINVOICES_CONVIVA 
+ UPDATE XXSV_CARGA_ARINVOICES_CONVIVA 
     SET STATUS = 'P'
   --WHERE INTERFACE_STATUS IS NULL   
   WHERE NVL(STATUS,'C') = 'C' 
@@ -314,10 +314,10 @@ BEGIN
                          P_ORG_ID,
                          V_BATCH_SOURCE_ID, 
                          'SV-TIGOCASH',
-                         SYSDATE,--arg5
+                         to_char(SYSDATE,fnd_date.canonical_DT_mask ),--arg5
                          '','','','','','' ,'','','','', --arg15
                          '','','','','','' ,'','','','', --arg25
-                         '','','','','','Y','',CHR(0)             --arg28
+                         'Y','','',CHR(0)         --arg28
 --                         '','','','','','','','','','',
 --                         '','','','','','','','','','',
 --                         '','','','','','','','','','',
@@ -326,6 +326,8 @@ BEGIN
 --                         '','','','','','','','','','',
 --                         '','','','','','','','','',''
                          );
+         --+ 1, 346, 76160, SV-TIGOCASH, 2014/05/07 00:00:00, , , , , , , , , , , , , , , , , , , , , Y,
+         --+ 1, 346, 76160, SV-TIGOCASH, 2014/05/08 10:38:12, , , , , , , , , , , , , , , , , , , , ,  , , , , , Y, ,
       COMMIT;
     END IF;
 
