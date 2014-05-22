@@ -26,6 +26,7 @@ CREATE OR REPLACE PACKAGE BODY BOLINF.XXSV_CARGA_INVOICES_PKG IS
         AR.CUST_TRX_TYPE_NAME,
         AR.LINK_TO_LINE_CONTEXT,
         AR.TAX_CODE,
+        AR.MEMO_LINE_NAME,
         AR.PRIMARY_SALESREP_NUMBER,
         AR.PRIMARY_SALESREP_ID,
         AR.ORIG_SYSTEM_BILL_ADDRESS_REF,
@@ -50,6 +51,7 @@ CREATE OR REPLACE PACKAGE BODY BOLINF.XXSV_CARGA_INVOICES_PKG IS
            AR.CUST_TRX_TYPE_NAME,
            AR.LINK_TO_LINE_CONTEXT,
            AR.TAX_CODE,
+           ar.MEMO_LINE_NAME,
            AR.PRIMARY_SALESREP_NUMBER,
            AR.PRIMARY_SALESREP_ID,
            AR.ORIG_SYSTEM_BILL_ADDRESS_REF,
@@ -193,7 +195,7 @@ BEGIN
           INTO L_LINE_SECUENCE
           FROM DUAL;
          
-     
+
         INSERT INTO AR.RA_INTERFACE_LINES_ALL (
                                                 INTERFACE_LINE_ID
                                                 ,INTERFACE_LINE_CONTEXT                                                
@@ -217,7 +219,8 @@ BEGIN
                                                 ,QUANTITY                                                
                                                 ,UNIT_SELLING_PRICE
                                                 ,PRINTING_OPTION
-                                                ,TAX_CODE                                                
+                                                ,TAX_CODE 
+                                                ,MEMO_LINE_NAME
                                                 ,PRIMARY_SALESREP_NUMBER
                                                 ,PRIMARY_SALESREP_ID
                                                 ,UOM_CODE                                                
@@ -248,7 +251,8 @@ BEGIN
                                                 ,I.QUANTITY
                                                 ,I.UNIT_SELLING_PRICE
                                                 ,I.PRINTING_OPTION
-                                                ,I.TAX_CODE                                                
+                                                ,I.TAX_CODE
+                                                ,I.MEMO_LINE_NAME                                         
                                                 ,SALESREP_NUMBER 
                                                 ,SALESREP_ID 
                                                 ,I.UOM_CODE                                                
@@ -317,7 +321,7 @@ BEGIN
                          to_char(SYSDATE,fnd_date.canonical_DT_mask ),--arg5
                          '','','','','','' ,'','','','', --arg15
                          '','','','','','' ,'','','','', --arg25
-                         'Y','','',CHR(0)         --arg28
+                         'Y','',CHR(0)         --arg28
 --                         '','','','','','','','','','',
 --                         '','','','','','','','','','',
 --                         '','','','','','','','','','',
