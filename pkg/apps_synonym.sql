@@ -1,0 +1,1 @@
+create or replace public synonym XXSV_CARGA_AR_INV_CONVIVA_S for BOLINF.XXSV_CARGA_AR_INV_CONVIVA_S;
