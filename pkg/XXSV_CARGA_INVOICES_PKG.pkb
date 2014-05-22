@@ -21,6 +21,8 @@ CREATE OR REPLACE PACKAGE BODY BOLINF.XXSV_CARGA_INVOICES_PKG IS
         AR.PRINTING_OPTION,
         AR.INTERFACE_LINE_CONTEXT,
         AR.INTERFACE_LINE_ATTRIBUTE1,
+        AR.INTERFACE_LINE_ATTRIBUTE2,
+        AR.INTERFACE_LINE_ATTRIBUTE3,
         AR.UOM_CODE,
         AR.BATCH_SOURCE_NAME,
         AR.CUST_TRX_TYPE_NAME,
@@ -46,6 +48,8 @@ CREATE OR REPLACE PACKAGE BODY BOLINF.XXSV_CARGA_INVOICES_PKG IS
            AR.PRINTING_OPTION,
            AR.INTERFACE_LINE_CONTEXT,
            AR.INTERFACE_LINE_ATTRIBUTE1,
+           AR.INTERFACE_LINE_ATTRIBUTE2,
+           AR.INTERFACE_LINE_ATTRIBUTE3,
            AR.UOM_CODE,
            AR.BATCH_SOURCE_NAME,
            AR.CUST_TRX_TYPE_NAME,
@@ -65,6 +69,7 @@ CREATE OR REPLACE PACKAGE BODY BOLINF.XXSV_CARGA_INVOICES_PKG IS
  INSERT_FLAG VARCHAR2(1);
  
  L_LINE_SECUENCE NUMBER;
+ V_INTERFACE_LINE_ATTRIBUTE3 NUMBER;
  L_GL_LINE_SECUENCE NUMBER;
  VCONTA NUMBER;
  VFLAG VARCHAR2(20);  
@@ -173,6 +178,9 @@ BEGIN
    WHERE USER_ID = P_USER_ID; 
  END;
  
+ 
+    fnd_file.put_line(fnd_file.output,'Begin Process');
+ 
  FOR I IN C_DATOS  LOOP
      -- 
      
@@ -186,20 +194,29 @@ BEGIN
         SALESREP_ID := -3;
      END IF;
 
+    
      IF INSERT_FLAG = 'Y' THEN
-     
-     
+
         VCONTA := VCONTA + 1;
+        
         
         SELECT APPS.RA_CUSTOMER_TRX_LINES_S.NEXTVAL 
           INTO L_LINE_SECUENCE
           FROM DUAL;
-         
+          
+        SELECT BOLINF.XXSV_CARGA_AR_INV_CONVIVA_S.NEXTVAL 
+          INTO V_INTERFACE_LINE_ATTRIBUTE3
+          FROM DUAL;
+          
+          fnd_file.put_line(fnd_file.output,'Secuence-> '|| V_INTERFACE_LINE_ATTRIBUTE3);
+
 
         INSERT INTO AR.RA_INTERFACE_LINES_ALL (
                                                 INTERFACE_LINE_ID
                                                 ,INTERFACE_LINE_CONTEXT                                                
                                                 ,INTERFACE_LINE_ATTRIBUTE1
+                                                ,INTERFACE_LINE_ATTRIBUTE2
+                                                ,INTERFACE_LINE_ATTRIBUTE3
                                                 ,BATCH_SOURCE_NAME                                                
                                                 ,SET_OF_BOOKS_ID
                                                 ,LINE_TYPE                                                
@@ -231,7 +248,9 @@ BEGIN
                                      VALUES (   
                                                 L_LINE_SECUENCE
                                                 ,I.INTERFACE_LINE_CONTEXT
-                                                ,VCONTA --I.INTERFACE_LINE_ATTRIBUTE1 
+                                                ,I.INTERFACE_LINE_ATTRIBUTE1 
+                                                ,I.CUST_TRX_TYPE_NAME -- I.INTERFACE_LINE_ATTRIBUTE2
+                                                ,V_INTERFACE_LINE_ATTRIBUTE3 -- I.INTERFACE_LINE_ATTRIBUTE3
                                                 ,I.BATCH_SOURCE_NAME
                                                 ,I.SET_OF_BOOKS_ID
                                                 ,I.LINE_TYPE
@@ -270,6 +289,8 @@ BEGIN
                      SALESREP_NUMBER,
                      INTERFACE_LINE_CONTEXT,
                      INTERFACE_LINE_ATTRIBUTE1,
+                     INTERFACE_LINE_ATTRIBUTE2,
+                     INTERFACE_LINE_ATTRIBUTE3,
                      CREATION_DATE
                    )
             VALUES ( '100',
@@ -277,14 +298,22 @@ BEGIN
                      P_ORG_ID,
                      P_USER_NAME,
                      I.INTERFACE_LINE_CONTEXT,
-                     VCONTA,--I.INTERFACE_LINE_ATTRIBUTE1,
+                     I.INTERFACE_LINE_ATTRIBUTE1,
+                     I.CUST_TRX_TYPE_NAME, --I.INTERFACE_LINE_ATTRIBUTE2,
+                     V_INTERFACE_LINE_ATTRIBUTE3, --I.INTERFACE_LINE_ATTRIBUTE3,
                      SYSDATE );                                                                     
 
      END IF;
      
+     
+     
  END LOOP;
  
  VFLAG := 'UPDATE STATUS';   
+ 
+ fnd_file.put_line(fnd_file.output,'----------------------------------------');
+ fnd_file.put_line(fnd_file.output,'Loops-> '|| VCONTA);
+  
  
  UPDATE XXSV_CARGA_ARINVOICES_CONVIVA 
     SET STATUS = 'P'
@@ -349,226 +378,270 @@ PROCEDURE XX_AP_INTERFACE (ERRBUF OUT VARCHAR2,
                             RETCODE OUT VARCHAR2,
                             P_ORG_ID NUMBER) IS
 
-CURSOR C_DATA_H IS
-SELECT DISTINCT
-       SOURCE, 
-       INVOICE_TYPE_LOOKUP_CODE,
-       INVOICE_NUM, 
-       INVOICE_DATE,
-       VENDOR_NUM,
-       VENDOR_SITE_CODE,
-       VENDOR_ID,
-       INVOICE_AMOUNT,
-       INVOICE_CURRENCY_CODE,
-       EXCHANGE_RATE_TYPE,
-       EXCHANGE_RATE,
-       EXCHANGE_DATE,
-       DESCRIPTION,
-       ORG_ID,
-       GL_DATE
-  FROM XXSV_CARGA_APINVOICES
- WHERE ORG_ID = P_ORG_ID
-   AND NVL(STATUS,'X') = 'X';
---
-CURSOR C_DATA_L (INV_NUM_L VARCHAR2, V_VENDOR_SITE_CODE VARCHAR2) IS
-SELECT LINE_TYPE_LOOKUP_CODE,
-       AMOUNT_LINE, 
-       --TAX_CODE,
-       DESCRIPTION_LINE,
-       DIST_CODE_CONCATENATED,
-       LINE_NUMBER
-  FROM XXSV_CARGA_APINVOICES
- WHERE ORG_ID = P_ORG_ID
-   AND NVL(STATUS,'X') = 'X'
-   AND INVOICE_NUM = INV_NUM_L
-   AND VENDOR_SITE_CODE = V_VENDOR_SITE_CODE;
-   
---
-ID_FACTURA NUMBER;
-vUser_Id NUMBER;
-Vresponsibility_Id NUMBER;
-NOM_BATCH VARCHAR2(250);
-REQUEST NUMBER;
-VFLAG VARCHAR2(250);
-VPHASE_CODE  VARCHAR2(1);
-VSTATUS_CODE VARCHAR2(1);
-EXISTE_BATCH NUMBER;
-V_VENDOR_NAME  VARCHAR2(240);
-V_VENDOR_ID NUMBER;
--- 
-BEGIN
+     CURSOR C_DATA_H IS
+     SELECT DISTINCT
+            SOURCE                      --+ 1
+           ,INVOICE_TYPE_LOOKUP_CODE    --+ 2
+           ,INVOICE_NUM                 --+ 3
+           ,INVOICE_DATE                --+ 4
+           ,VENDOR_NUM                  --+ 5
+           ,VENDOR_SITE_CODE            --+ 6
+           ,INVOICE_AMOUNT              --+ 7
+           ,INVOICE_CURRENCY_CODE       --+ 8
+           ,EXCHANGE_RATE_TYPE          --+ 9
+           ,EXCHANGE_RATE               --+ 10
+           ,EXCHANGE_DATE               --+ 11
+           ,DESCRIPTION                 --+ 12
+           ,ORG_ID                      --+ 13
+           ,GL_DATE                     --+ 14
+           ,CALC_TAX_DURING_IMPORT_FLAG
+      FROM XXSV_CARGA_APINVOICES ivh
+     WHERE ivh.ORG_ID = P_ORG_ID
+       AND NVL(ivh.STATUS,'X') = 'X'
+       order by VENDOR_NUM, VENDOR_SITE_CODE, INVOICE_NUM;
 
- FOR K IN C_DATA_H LOOP
-     
-     BEGIN 
-       SELECT PV.VENDOR_NAME,
-              PV.VENDOR_ID
-         INTO V_VENDOR_NAME,
-              V_VENDOR_ID    
-         FROM PO_VENDORS PV,
-              PO_VENDOR_SITES_ALL PVS
-        WHERE PV.VENDOR_ID = PVS.VENDOR_ID
-          AND PVS.ORG_ID = P_ORG_ID   
-          AND PVS.VENDOR_SITE_CODE= K.VENDOR_SITE_CODE;
-    EXCEPTION 
-      WHEN OTHERS THEN
-           V_VENDOR_NAME := NULL;
-    END;              
+     CURSOR C_DATA_L ( P_ORG_ID number, p_inv_num VARCHAR2, p_vendor_num VARCHAR2, p_VENDOR_SITE_CODE VARCHAR2) IS
+     SELECT LINE_TYPE_LOOKUP_CODE
+           ,AMOUNT_LINE
+           ,DESCRIPTION_LINE
+           ,DIST_CODE_CONCATENATED
+           ,LINE_NUMBER
+           ,TAX_CODE
+           ,TAX    
+           ,CALC_TAX_DURING_IMPORT_FLAG
+      FROM XXSV_CARGA_APINVOICES
+     WHERE ORG_ID = P_ORG_ID
+       AND NVL(STATUS,'X') = 'X'
+       AND INVOICE_NUM = p_inv_num
+       AND VENDOR_NUM = p_vendor_num
+       and VENDOR_SITE_CODE =  p_VENDOR_SITE_CODE
+       ;   
+
+
+    ID_FACTURA NUMBER;
+    vUser_Id NUMBER;
+    Vresponsibility_Id NUMBER;
+    NOM_BATCH VARCHAR2(250);
+    REQUEST NUMBER;
+    VFLAG VARCHAR2(250);
+    VPHASE_CODE  VARCHAR2(1);
+    VSTATUS_CODE VARCHAR2(1);
+    EXISTE_BATCH NUMBER;
+    V_VENDOR_NAME  VARCHAR2(240);
+    V_VENDOR_ID NUMBER;
+    v_heder_count number;
+    v_line_count number;
+    -- 
+    BEGIN
+
+
+    BEGIN
     
-     
-     
-     -- INCREMENTA EN UNO LA SECUENCIA
-     SELECT AP_INVOICES_S.NEXTVAL 
-       INTO ID_FACTURA
-       FROM DUAL;
-     --
-     INSERT INTO AP_INVOICES_INTERFACE
-                          ( SOURCE, 
-                            INVOICE_TYPE_LOOKUP_CODE,
-                            INVOICE_NUM, 
-                            INVOICE_DATE,
-                            GL_DATE,   
-                            VENDOR_ID,
-                            VENDOR_NAME,
-                            VENDOR_SITE_CODE,
-                            INVOICE_AMOUNT,
-                            INVOICE_CURRENCY_CODE,
-                            EXCHANGE_RATE_TYPE,
-                            EXCHANGE_RATE,
-                            EXCHANGE_DATE,
-                            DESCRIPTION,
-                            ORG_ID,
-                            INVOICE_ID,
-                            INVOICE_RECEIVED_DATE)
-                   VALUES ( K.SOURCE, 
-                            K.INVOICE_TYPE_LOOKUP_CODE,
-                            K.INVOICE_NUM, 
-                            K.INVOICE_DATE,
-                            K.INVOICE_DATE,
-                            V_VENDOR_ID,
-                            V_VENDOR_NAME,
-                            K.VENDOR_SITE_CODE,
-                            K.INVOICE_AMOUNT,
-                            K.INVOICE_CURRENCY_CODE,
-                            K.EXCHANGE_RATE_TYPE,
-                            K.EXCHANGE_RATE,
-                            K.EXCHANGE_DATE,
-                            K.DESCRIPTION,
-                            K.ORG_ID,
-                            ID_FACTURA,
-                            K.INVOICE_DATE); 
-     --
-     FOR J IN C_DATA_L (K.INVOICE_NUM, K.VENDOR_SITE_CODE) LOOP
+        fnd_file.put_line(fnd_file.output,'');
+        fnd_file.put_line(fnd_file.output,'');
+        fnd_file.put_line(fnd_file.output,'                        Importing Invoices                       ');
+        fnd_file.put_line(fnd_file.output,'                             CONVIVA                             ');
+        fnd_file.put_line(fnd_file.output,'');
+        fnd_file.put_line(fnd_file.output,'');
+        
+        fnd_file.put_line(fnd_file.output, 'Secuence,Vendor_number,Vendor_site_code,Ivoice_Number,invoice_amount,line_count'  );
+        v_heder_count := 0;
+        FOR K IN C_DATA_H LOOP
+         
+            v_heder_count := v_heder_count +1;       
+             BEGIN 
+               SELECT sp.VENDOR_NAME,
+                      sp.VENDOR_ID
+                 INTO V_VENDOR_NAME,
+                      V_VENDOR_ID    
+                 FROM apps.ap_suppliers sp,
+                      apps.ap_supplier_SITES_ALL SS
+                WHERE sp.VENDOR_ID = ss.VENDOR_ID
+                  AND ss.ORG_ID = P_ORG_ID
+                  AND ss.VENDOR_SITE_CODE= K.VENDOR_SITE_CODE
+                  and sp.segment1 = k.VENDOR_NUM;
+            EXCEPTION 
+              WHEN OTHERS THEN
+                   V_VENDOR_NAME := NULL;
+            END;              
+         
+         
+         -- INCREMENTA EN UNO LA SECUENCIA
+         SELECT AP_INVOICES_S.NEXTVAL 
+           INTO ID_FACTURA
+           FROM DUAL;
          --
-         INSERT INTO AP_INVOICE_LINES_INTERFACE
-                    ( LINE_TYPE_LOOKUP_CODE,
-                      AMOUNT, 
-                     -- TAX_CODE,
-                      DESCRIPTION,
-                      DIST_CODE_CONCATENATED,                      
-                      LINE_NUMBER,
-                      ACCOUNTING_DATE,
-                      INVOICE_ID
-                      ) 
-             VALUES ( J.LINE_TYPE_LOOKUP_CODE,
-                      J.AMOUNT_LINE, 
-                      --J.TAX_CODE,
-                      J.DESCRIPTION_LINE,
-                      J.DIST_CODE_CONCATENATED,
-                      J.LINE_NUMBER,
-                      K.GL_DATE, 
-                      ID_FACTURA );
-            --
-     END LOOP; -- CIERRA EL LOOP DE LOS DETALLES DE FACTURA 
- END LOOP; -- CIERRA EL LOOP DE CABECERAS DE FACTURA
- --
- COMMIT;
- --
- UPDATE XXSV_CARGA_APINVOICES
-    SET STATUS = 'P'
-  WHERE ORG_ID = P_ORG_ID
-    AND NVL(STATUS,'X') = 'X';
- --
- COMMIT;
- /*
- SELECT MIN(A.Responsibility_Id) 
-   INTO Vresponsibility_Id
-   FROM Fnd_User_Resp_Groups A, 
-        Fnd_Responsibility_Tl C,
-        Fnd_Profile_Options_Vl D, 
-        Fnd_Profile_Option_Values E
-  WHERE A.Responsibility_Id = C.Responsibility_Id
-    AND A.Responsibility_Id = E.Level_Value
-    AND E.Profile_Option_Id = D.Profile_Option_Id
-    AND A.Responsibility_Application_Id = 200-- Codigo De Aplicacion 
-    AND E.Profile_Option_Value = (SELECT H.ORGANIZATION_ID
-                                    FROM HR_OPERATING_UNITS H 
-                                   WHERE H.ORGANIZATION_ID = P_ORG_ID )  --Nombre Libro
-    AND D.Profile_Option_Name = 'ORG_ID'
-    AND TO_CHAR(A.END_DATE,'DD/MM/YYYY') = '01/01/9999';*/
- --
- --FND_GLOBAL.APPS_INITIALIZE(2961, Vresponsibility_Id, 200);
- 
- vUser_Id  := fnd_global.USER_ID;
- --
- NOM_BATCH := SUBSTR('INVOICE_UPLOAD' ||'-' ||TO_CHAR(SYSDATE,'YYYYMMDD HH24:MI:SS'),1,30);
- 
- REQUEST := FND_REQUEST.SUBMIT_REQUEST ('SQLAP',
-                                        'APXIIMPT',
-                                        '',
-                                        '',
-                                        FALSE,
-                                        P_ORG_ID,
-                                        'INVOICE_UPLOAD',
-                                        '',
-                                        NOM_BATCH,
-                                        '',
-                                        '',
-                                        '',--GL_DATE
-                                        'N',
-                                        'N', 
-                                        'N', 
-                                        'N',
-                                        '1000', 
-                                        vUser_Id, 
-                                        '-1', 
-                                        CHR(0), 
-                                        '', '', '', '', '', '', '',
-                                        '', '', '', '', '', '', '',
-                                        '', '', '', '', '', '', '',
-                                        '', '', '', '', '', '', '',
-                                        '', '', '', '', '', '', '',
-                                        '', '', '', '', '', '', '',
-                                        '', '', '', '', '', '', '',
-                                        '', '', '', '', '', '', '',
-                                        '', '', '', '', '', '', '',
-                                        '', '', '', '', '', '', '',
-                                        '', '', '', '', '', '', '',
-                                        '', '', '', '', '', '', '',
-                                        '');
- --
- COMMIT;
- -- LOOP PARA ESPERAR QUE FINALICE EL REQUEST
-  LOOP
-   --
-   -- TIMER
-   DBMS_LOCK.sleep(10);
-   --
-   SELECT PHASE_CODE,
-          STATUS_CODE  
-     INTO VPHASE_CODE,
-          VSTATUS_CODE
-     FROM FND_CONCURRENT_REQUESTS
-    WHERE REQUEST_ID = REQUEST;
-   --
-   EXIT WHEN VPHASE_CODE = 'C';        
-  END LOOP;
-  --
-  IF VSTATUS_CODE IN ('G','E') THEN
-     VFLAG := 'EL REQUEST NUMERO ' || TO_CHAR(REQUEST) || ' FINALIZO CON ERROR';
-  END IF;
-  -- 
+         
+         INSERT INTO AP_INVOICES_INTERFACE
+                               (SOURCE                      --+ 1
+                               ,INVOICE_TYPE_LOOKUP_CODE    --+ 2
+                               ,INVOICE_NUM                 --+ 3
+                               ,INVOICE_DATE                --+ 4
+                               ,GL_DATE                     --+ 5
+                               ,VENDOR_ID                   --+ 6
+                               ,VENDOR_NAME                 --+ 7
+                               ,VENDOR_SITE_CODE            --+ 8
+                               ,INVOICE_AMOUNT              --+ 9
+                               ,INVOICE_CURRENCY_CODE       --+ 10
+                               ,EXCHANGE_RATE_TYPE          --+ 11
+                               ,EXCHANGE_RATE               --+ 12
+                               ,EXCHANGE_DATE               --+ 13
+                               ,DESCRIPTION                 --+ 14
+                               ,ORG_ID                      --+ 15
+                               ,INVOICE_ID                  --+ 16
+                               ,INVOICE_RECEIVED_DATE       --+ 17
+                               ,CALC_TAX_DURING_IMPORT_FLAG
+                               )
+                       VALUES  (K.SOURCE                    --+ 1
+                               ,K.INVOICE_TYPE_LOOKUP_CODE  --+ 2
+                               ,K.INVOICE_NUM               --+ 3
+                               ,K.INVOICE_DATE              --+ 4
+                               ,K.INVOICE_DATE              --+ 5
+                               ,V_VENDOR_ID                 --+ 6*
+                               ,V_VENDOR_NAME               --+ 7*
+                               ,K.VENDOR_SITE_CODE          --+ 8
+                               ,K.INVOICE_AMOUNT            --+ 9
+                               ,K.INVOICE_CURRENCY_CODE     --+ 10
+                               ,K.EXCHANGE_RATE_TYPE        --+ 11
+                               ,K.EXCHANGE_RATE             --+ 12
+                               ,K.EXCHANGE_DATE             --+ 13
+                               ,K.DESCRIPTION               --+ 14
+                               ,K.ORG_ID                    --+ 15
+                               ,ID_FACTURA                  --+ 16*
+                               ,K.INVOICE_DATE              --+ 17
+                               ,K.CALC_TAX_DURING_IMPORT_FLAG
+                                ); 
+         --
+            v_line_count := 0;
+            FOR J IN C_DATA_L (K.ORG_ID, K.INVOICE_NUM, k.VENDOR_NUM ,K.VENDOR_SITE_CODE) LOOP
+             --
+               v_line_count := v_line_count + 1;
+             
+             INSERT INTO AP_INVOICE_LINES_INTERFACE --+ 
+                        ( LINE_TYPE_LOOKUP_CODE     --+ 1
+                         ,AMOUNT                    --+ 2
+                         ,DESCRIPTION               --+ 3
+                         ,DIST_CODE_CONCATENATED    --+ 4
+                         ,LINE_NUMBER               --+ 5
+                         ,ACCOUNTING_DATE           --+ 6
+                         ,INVOICE_ID                --+ 7
+                         ,TAX_CODE                  --+ 8
+                         ,TAX
+                         ) 
+                 VALUES  (J.LINE_TYPE_LOOKUP_CODE   --+ 1
+                         ,J.AMOUNT_LINE             --+ 2
+                         ,J.DESCRIPTION_LINE        --+ 3
+                         ,J.DIST_CODE_CONCATENATED  --+ 4
+                         ,J.LINE_NUMBER             --+ 5
+                         ,K.GL_DATE                 --+ 6
+                         ,ID_FACTURA                --+ 7
+                         ,j.TAX_CODE
+                         ,j.TAX    
+                         );
+                         
+            END LOOP; -- CIERRA EL LOOP DE LOS DETALLES DE FACTURA 
+            fnd_file.put_line(fnd_file.output,v_heder_count ||','|| k.VENDOR_NUM ||','||K.VENDOR_SITE_CODE||','|| K.INVOICE_NUM||','|| k.INVOICE_AMOUNT ||','||v_line_count  );
+            
+            
+        END LOOP; -- CIERRA EL LOOP DE CABECERAS DE FACTURA
+     --
+     COMMIT;
+     --
+     UPDATE XXSV_CARGA_APINVOICES
+        SET STATUS = 'P'
+      WHERE ORG_ID = P_ORG_ID
+        AND NVL(STATUS,'X') = 'X';
+
+     COMMIT;
+     
+    EXCEPTION WHEN OTHERS THEN
+        fnd_file.put_line(fnd_file.output,'EXCEPCION IMPORTING TO INTERFACE '|| SQLERRM);
+    END;
+
+     /*
+     SELECT MIN(A.Responsibility_Id) 
+       INTO Vresponsibility_Id
+       FROM Fnd_User_Resp_Groups A, 
+            Fnd_Responsibility_Tl C,
+            Fnd_Profile_Options_Vl D, 
+            Fnd_Profile_Option_Values E
+      WHERE A.Responsibility_Id = C.Responsibility_Id
+        AND A.Responsibility_Id = E.Level_Value
+        AND E.Profile_Option_Id = D.Profile_Option_Id
+        AND A.Responsibility_Application_Id = 200-- Codigo De Aplicacion 
+        AND E.Profile_Option_Value = (SELECT H.ORGANIZATION_ID
+                                        FROM HR_OPERATING_UNITS H 
+                                       WHERE H.ORGANIZATION_ID = P_ORG_ID )  --Nombre Libro
+        AND D.Profile_Option_Name = 'ORG_ID'
+        AND TO_CHAR(A.END_DATE,'DD/MM/YYYY') = '01/01/9999';*/
+     --
+     --FND_GLOBAL.APPS_INITIALIZE(2961, Vresponsibility_Id, 200);
+
+
+    begin
+        vUser_Id  := fnd_global.USER_ID;
+        --
+        NOM_BATCH := SUBSTR('INVOICE_UPLOAD' ||'-' ||TO_CHAR(SYSDATE,'YYYYMMDD HH24:MI:SS'),1,30);
+             
+        REQUEST := FND_REQUEST.SUBMIT_REQUEST ('SQLAP',
+                                            'APXIIMPT',
+                                            '',
+                                            '',
+                                            FALSE,
+                                            P_ORG_ID,
+                                            'INVOICE_UPLOAD',
+                                            '',
+                                            NOM_BATCH,
+                                            '',
+                                            '',
+                                            '',--GL_DATE
+                                            'N',
+                                            'N', 
+                                            'N', 
+                                            'N',
+                                            '1000', 
+                                            vUser_Id, 
+                                            '-1', 
+                                            CHR(0), 
+                                            '', '', '', '', '', '', '',
+                                            '', '', '', '', '', '', '',
+                                            '', '', '', '', '', '', '',
+                                            '', '', '', '', '', '', '',
+                                            '', '', '', '', '', '', '',
+                                            '', '', '', '', '', '', '',
+                                            '', '', '', '', '', '', '',
+                                            '', '', '', '', '', '', '',
+                                            '', '', '', '', '', '', '',
+                                            '', '', '', '', '', '', '',
+                                            '', '', '', '', '', '', '',
+                                            '', '', '', '', '', '', '',
+                                            '');
+        --
+        COMMIT;
+        -- LOOP PARA ESPERAR QUE FINALICE EL REQUEST
+        --    LOOP
+        --       --
+        --       -- TIMER
+        --       DBMS_LOCK.sleep(10);
+        --       --
+        --       SELECT PHASE_CODE,
+        --              STATUS_CODE  
+        --         INTO VPHASE_CODE,
+        --              VSTATUS_CODE
+        --         FROM FND_CONCURRENT_REQUESTS
+        --        WHERE REQUEST_ID = REQUEST;
+        --       --
+        --       EXIT WHEN VPHASE_CODE = 'C';        
+        --    END LOOP;
+        --
+        IF VSTATUS_CODE IN ('G','E') THEN
+         VFLAG := 'EL REQUEST NUMERO ' || TO_CHAR(REQUEST) || ' FINALIZO CON ERROR';
+        END IF;
+        -- 
     
+    EXCEPTION WHEN OTHERS THEN
+        fnd_file.put_line(fnd_file.output,'EXCEPCION SUBMITTING RECUEST '|| SQLERRM);
+    END;
 END XX_AP_INTERFACE;
 
 -- XXSV INV KARDEX
